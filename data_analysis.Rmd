@@ -5,9 +5,9 @@ output: html_document
 
 ```{r}
 NHANES_screen <- NHANES |>
-  filter(!is.na(CompHrsDay) & Gender == "male" & !is.na(TVHrsDay) & !is.na(Testosterone)) |>
-  select(c("Gender", 'Testosterone', 'Depressed', "Age","CompHrsDay", 'TVHrsDay', 'BMI'))
+  filter(!is.na(CompHrsDay) & Gender == "male" & !is.na(TVHrsDay) & !is.na(Testosterone) & !is.na(Depressed)) |>
+  select(c("Gender", 'Testosterone', 'Depressed', "Age","CompHrsDay", 'TVHrsDay', 'BMI', 'LittleInterest', 'SleepHrsNight', 'HHIncome', 'PhysActive'))
   
 
-  NHANES_early_baby
+  NHANES_screen
 ```
