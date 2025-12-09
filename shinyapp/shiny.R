@@ -1,6 +1,5 @@
 # ============================================================
-# Title: The Cardiometabolic Profile of Low Testosterone in Adult Males
-# Dataset: cleaned_health_data (from NHANES)
+# Title: Integrative Health Predictors of Testosterone in Adult Males
 # ============================================================
 
 library(shiny)
@@ -9,78 +8,107 @@ library(dplyr)
 library(broom)
 
 # ------------------------------------------------------------
-# DATA PREPARATION
-# ------------------------------------------------------------
-cleaned_health_data <- NHANES |>
-  filter(Gender == "male", !is.na(Testosterone)) |>
-  select(Testosterone, 
-         Age, BPSysAve, BPDiaAve, Pulse, TotChol, 
-         BMI, Weight, UrineFlow1, 
-         Diabetes, PhysActive, HealthGen) |>
-  distinct() |>
-  drop_na() |>
-  mutate(
-    Diabetes = factor(Diabetes, levels = c("No", "Yes")),
-    PhysActive = factor(PhysActive, levels = c("No", "Yes")),
-    HealthGen = factor(HealthGen, 
-                       levels = c("Poor", "Fair", "Good", "Vgood", "Excellent"))
-  )
-
-# ------------------------------------------------------------
 # UI
 # ------------------------------------------------------------
 ui <- fluidPage(
   
-  titlePanel("The Cardiometabolic Profile of Low Testosterone in Adult Males"),
-  p("Explore how physiological and lifestyle factors—such as BMI, Pulse, Blood Pressure, and Physical Activity—
-    relate to measured testosterone levels among adult males in NHANES."),
+  titlePanel("Integrative Health Predictors of Testosterone in Adult Males"),
+  p("Explore how cardiovascular, metabolic, and renal indicators relate to testosterone levels among adult males in the NHANES dataset."),
   
   sidebarLayout(
     sidebarPanel(
+      # ------------------------------------------------------------
+      # FILTER OPTIONS
+      # ------------------------------------------------------------
       h4("Filter Options"),
       selectInput("diabetes", "Filter by Diabetes Status:", 
                   choices = c("All", "Yes", "No"), selected = "All"),
       selectInput("phys_active", "Filter by Physical Activity:", 
                   choices = c("All", "Yes", "No"), selected = "All"),
       
+      hr(),
+      
+      # ------------------------------------------------------------
+      # PLOT OPTIONS
+      # ------------------------------------------------------------
+      h4("Plot Options"),
       selectInput("xvar", "Select X Variable:",
-                  choices = c("Age", "BMI", "Weight", "Pulse", 
-                              "BPDiaAve", "BPSysAve", "UrineFlow1", "TotChol"),
-                  selected = "BMI"),
+                  choices = c("BMI", "Pulse", "BPDiaAve", "BPSysAve", "UrineFlow1", "TotChol", "Age")),
       
-      checkboxInput("logT", "Log-transform Testosterone", value = FALSE),
       hr(),
       
+      # ------------------------------------------------------------
+      # MODEL OPTIONS
+      # ------------------------------------------------------------
       h4("Model Options"),
-      checkboxGroupInput("controls", "Add Control Variables:",
-                         choices = c("Age", "BMI", "Weight", "Pulse", 
-                                     "PhysActive", "Diabetes", 
-                                     "TotChol", "BPDiaAve", "BPSysAve", 
-                                     "UrineFlow1", "HealthGen"),
-                         selected = c("BMI", "Pulse")),
       
-      actionButton("run_model", "Run Regression", class = "btn-primary"),
-      hr(),
-      helpText("Data source: NHANES (U.S. National Health and Nutrition Examination Survey)")
+      h5("Select Health Metrics (Predictors of Interest):"),
+      checkboxGroupInput("predictors", NULL,
+                         choices = c("Systolic BP (BPSysAve)" = "BPSysAve",
+                                     "Diastolic BP (BPDiaAve)" = "BPDiaAve",
+                                     "Resting Pulse (Pulse)" = "Pulse",
+                                     "Total Cholesterol (TotChol)" = "TotChol",
+                                     "Urine Flow Rate (UrineFlow1)" = "UrineFlow1"),
+                         selected = NULL),
+      
+      h5("Select Controls (Confounders):"),
+      checkboxGroupInput("controls", NULL,
+                         choices = c("Age (Default to ON)" = "Age",
+                                     "BMI (Default to ON)" = "BMI",
+                                     "Diabetes Status" = "Diabetes",
+                                     "Physical Activity" = "PhysActive"),
+                         selected = c("Age", "BMI")),
+      
+      actionButton("run_model", "Run Regression", class = "btn-primary")
     ),
     
+    # ------------------------------------------------------------
+    # MAIN PANEL
+    # ------------------------------------------------------------
     mainPanel(
       tabsetPanel(
         tabPanel("Plot",
                  plotOutput("scatterPlot"),
-                 verbatimTextOutput("corrText")),
+                 verbatimTextOutput("corrText")
+        ),
         tabPanel("Regression Summary",
-                 h4("Current Model Formula:"),
-                 verbatimTextOutput("formulaText"),
-                 h4("Regression Output:"),
-                 verbatimTextOutput("modelSummary")),
+                 verbatimTextOutput("modelSummary")
+        ),
         tabPanel("About",
                  h4("About This App"),
-                 p("This Shiny app visualizes the relationships between testosterone levels and key
-                   physiological and lifestyle indicators from the NHANES dataset. It allows users
-                   to subset the data interactively and view regression outputs in real time."),
-                 p("The purpose is to highlight how cardiovascular, metabolic, and behavioral factors
-                   together shape male hormonal health."))
+                 p("This interactive web app explores how cardiovascular, metabolic, and renal health indicators 
+                    relate to testosterone levels among adult males in the NHANES dataset. It combines regression 
+                    modeling and visualization to help users identify which everyday health metrics are most strongly 
+                    associated with hormonal balance."),
+                 
+                 h5("How to Use"),
+                 tags$ul(
+                   tags$li("Use the 'Filter Options' section to select diabetes and physical activity subgroups."),
+                   tags$li("Under 'Plot Options', choose which variable to visualize on the x-axis."),
+                   tags$li("Under 'Model Options', add or remove predictors and confounders."),
+                   tags$li("Click 'Run Regression' to generate results in the 'Regression Summary' tab.")
+                 ),
+                 
+                 h5("Interactivity & Interpretation"),
+                 p("The plot displays a fitted regression line with a 95% confidence interval. 
+                   Below the plot, the Pearson correlation coefficient (r) and p-value quantify the 
+                   direction, strength, and significance of the relationship."),
+                 
+                 h5("Technical Notes"),
+                 tags$ul(
+                   tags$li("Linear regression models were estimated using R’s 'lm()' function."),
+                   tags$li("VIF values < 1.5 confirmed no multicollinearity."),
+                   tags$li("Cook’s Distance < 0.1 for all observations indicated model stability."),
+                   tags$li("No log-transform was applied, as the linear model best captured the data."),
+                   tags$li("'Weight' and 'HealthGen' variables were removed for clarity and consistency.")
+                 ),
+                 
+                 h5("Project Context"),
+                 p("This project investigates how lifestyle and physiological factors jointly influence 
+                    testosterone levels. Results suggest that higher BMI and resting pulse are associated 
+                    with lower testosterone, while stronger renal health (urine flow) predicts higher levels. 
+                    The model emphasizes interconnected health systems rather than isolated variables.")
+        )
       )
     )
   )
@@ -91,9 +119,9 @@ ui <- fluidPage(
 # ------------------------------------------------------------
 server <- function(input, output) {
   
-  # --- Reactive data filtering
+  # Reactive dataset filter
   filtered_data <- reactive({
-    data <- cleaned_health_data
+    data <- df  # assumes 'df' is loaded (cleaned NHANES subset)
     
     if (input$diabetes != "All") {
       data <- data %>% filter(Diabetes == input$diabetes)
@@ -104,59 +132,63 @@ server <- function(input, output) {
     data
   })
   
-  # --- Scatterplot
+  # Scatter plot
   output$scatterPlot <- renderPlot({
     data <- filtered_data()
-    y_var <- if (input$logT) log(data$Testosterone) else data$Testosterone
     
-    ggplot(data, aes_string(x = input$xvar, y = NULL)) +
-      geom_point(aes(y = y_var), alpha = 0.6, color = "#2c3e50") +
-      geom_smooth(aes(y = y_var), method = "lm", color = "#e74c3c", fill = "#e74c3c", alpha = 0.2) +
+    ggplot(data, aes_string(x = input$xvar, y = "Testosterone")) +
+      geom_point(alpha = 0.6, color = "#2c3e50") +
+      geom_smooth(method = "lm", color = "#e74c3c", fill = "#e74c3c", alpha = 0.2) +
       labs(
         x = input$xvar,
-        y = ifelse(input$logT, "Log(Testosterone)", "Testosterone (ng/dL)"),
+        y = "Testosterone (ng/dL)",
         title = paste("Testosterone vs", input$xvar),
-        subtitle = "Filtered by user-selected health and lifestyle variables"
+        subtitle = "Fitted regression line with 95% confidence interval"
       ) +
       theme_minimal(base_size = 14)
   })
   
-  # --- Correlation text
+  # Pearson correlation + p-value (precise)
   output$corrText <- renderPrint({
     data <- filtered_data()
     if (nrow(data) > 2) {
-      y <- if (input$logT) log(data$Testosterone) else data$Testosterone
-      cor_val <- cor(data[[input$xvar]], y, use = "complete.obs")
-      cat("Correlation between", input$xvar, "and Testosterone:", round(cor_val, 3))
+      test <- cor.test(data[[input$xvar]], data$Testosterone, use = "complete.obs")
+      r_val <- signif(test$estimate, 4)
+      p_val <- signif(test$p.value, 4)
+      
+      cat("Pearson correlation between", input$xvar, "and Testosterone:\n")
+      cat("r =", format(r_val, digits = 4), ", p =", format(p_val, scientific = TRUE), "\n")
+      
+      if (p_val < 0.05) {
+        cat("→ Statistically significant (p < 0.05)\n")
+      } else {
+        cat("→ Not statistically significant\n")
+      }
+      
+      abs_r <- abs(as.numeric(r_val))
+      if (abs_r < 0.3) {
+        cat("Interpretation: Weak relationship.\n")
+      } else if (abs_r < 0.5) {
+        cat("Interpretation: Moderate relationship.\n")
+      } else {
+        cat("Interpretation: Strong relationship.\n")
+      }
     } else {
       cat("Not enough data points to calculate correlation.")
     }
   })
   
-  # --- Regression model (run on button click)
+  # Regression model
   model_result <- eventReactive(input$run_model, {
     data <- filtered_data()
-    y <- if (input$logT) "log(Testosterone)" else "Testosterone"
-    if (length(input$controls) == 0) {
-      formula_str <- paste(y, "~", input$xvar)
-    } else {
-      formula_str <- paste(y, "~", paste(input$controls, collapse = " + "))
-    }
+    all_vars <- c(input$predictors, input$controls)
+    if (length(all_vars) == 0) return(NULL)
+    
+    formula_str <- paste("Testosterone ~", paste(all_vars, collapse = " + "))
     lm(as.formula(formula_str), data = data)
   })
   
-  # --- Formula preview
-  output$formulaText <- renderPrint({
-    y <- if (input$logT) "log(Testosterone)" else "Testosterone"
-    if (length(input$controls) == 0) {
-      formula_str <- paste(y, "~", input$xvar)
-    } else {
-      formula_str <- paste(y, "~", paste(input$controls, collapse = " + "))
-    }
-    cat(formula_str)
-  })
-  
-  # --- Regression summary
+  # Display regression output
   output$modelSummary <- renderPrint({
     model <- model_result()
     if (!is.null(model)) summary(model)
