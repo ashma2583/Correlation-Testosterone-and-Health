@@ -5,6 +5,9 @@ output: html_document
 
 ```{r}
 library(dplyr)
+library(ggplot2)
+library(car)
+library(gridExtra)
 ```
 
 
@@ -17,10 +20,14 @@ df <- NHANES |>
          BMI,                                   # body composition               
          UrineFlow1,                            # urine
          Diabetes, PhysActive                   # general health
-         ) |>
+  ) |>
   distinct() |>
   drop_na() |>
-  mutate(Diabetes = factor(Diabetes))
+  mutate(
+    Diabetes = factor(Diabetes),
+    PhysActive = factor(PhysActive)
+  )
+df
 ```
 
 
@@ -29,4 +36,77 @@ df <- NHANES |>
 model <- lm(Testosterone ~ Age + BPSysAve + BPDiaAve + Pulse + TotChol + BMI + UrineFlow1 + Diabetes + PhysActive, data = df)
 summary(model)
 ```
+
+```{r}
+vif(model)
+```
+
+We tested for multicollinearity using the Variance Inflation Factor (VIF). All VIF values were below 1.5, indicating that multicollinearity was not a concern. Therefore, the lack of statistical significance for Systolic Blood Pressure suggests a genuine lack of association, rather than confounding by Age or Diastolic pressure.
+
+
+```{r}
+par(mfrow = c(2, 2))
+plot(model)
+```
+
+The Residual vs Fitted plot checks if our model has successfully extracted all the meaningful "signal" from the data, leaving behind only random "noise." In an ideal linear model, the errors (residuals) should be randomly scattered around the horizontal zero line with no discernible pattern. Our Residual vs Fitted plot is random, meaning that our model has extracted all the meaningful data.
+
+
+### Checking for outliers
+```{r}
+plot(model, which = 2, main = "Q-Q Plot")
+```
+
+
+```{r}
+# Testosterone Outliers
+p1 <- ggplot(df, aes(y = Testosterone)) + 
+  geom_boxplot(fill = "lightblue", outlier.colour = "red", outlier.shape = 1) +
+  labs(title = "Testosterone Outliers", y = "Testosterone (ng/dL)") +
+  theme_minimal()
+
+# BMI Outliers
+p2 <- ggplot(df, aes(y = BMI)) + 
+  geom_boxplot(fill = "lightgreen", outlier.colour = "red", outlier.shape = 1) +
+  labs(title = "BMI Outliers", y = "BMI") +
+  theme_minimal()
+
+grid.arrange(p1, p2, ncol = 2)
+```
+
+```{r}
+# Calculate Cook's Distance
+cooksD <- cooks.distance(model)
+
+plot(cooksD, pch="*", cex=2, main="Influential Obs by Cook's distance")
+abline(h = 4/nrow(df), col="red")  # The red line is the "danger zone" threshold
+text(x=1:length(cooksD)+1, y=cooksD, labels=ifelse(cooksD>4/nrow(df),names(cooksD),""), col="red")
+```
+
+```{r}
+# Top few outliers
+df[c(112, 352, 716, 805), ]
+```
+We identified a few high-residual outliers, including a 63-year-old subject with testosterone levels of 1795. However, Cook's Distance analysis ($D < 0.1$) confirmed that these influential points did not significantly distort the model parameters, so they were retained to preserve sample integrity.
+
+
+```{r}
+library(car)
+crPlots(model)
+```
+
+### log model
+```{r}
+log_model <- lm(log(Testosterone) ~ Age + BPSysAve + BPDiaAve + Pulse + TotChol + BMI + UrineFlow1 + Diabetes + PhysActive, data = df)
+summary(log_model)
+```
+In the log model, age becomes insignificant. This is incorrect which indicates that the log transformation likely compressed the data too much, hiding the gradual decline of testosterone with age. The $R^2$ value also drops, meaning that the log model explains less of the variation in the data than the simple linear model. Additionally, the Q-Q plot was mainly linear, meaning the linear model already fits the data pretty well. We are going to stick to the linear model.
+
+
+### Final model
+```{r}
+summary(model)
+```
+
+
 
