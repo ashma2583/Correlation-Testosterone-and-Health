@@ -5,7 +5,6 @@ output: html_document
 
 ```{r}
 library(dplyr)
-
 ```
 
 
@@ -27,7 +26,7 @@ df <- NHANES |>
 
 ### Model
 ```{r}
-model <- lm(Testosterone ~ Age + BPSysAve + BPDiaAve + Pulse + TotChol + BMI + UrineFlow1 + Diabetes + PhysActive, data = final_data)
-summary(corrected_model)
+model <- lm(Testosterone ~ Age + BPSysAve + BPDiaAve + Pulse + TotChol + BMI + UrineFlow1 + Diabetes + PhysActive, data = df)
+summary(model)
 ```
 
