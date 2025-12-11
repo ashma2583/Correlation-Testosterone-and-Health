@@ -18,7 +18,7 @@ The application allows users to visualize these relationships dynamically, provi
 * **Model Variance:** The combined health indicators explain approximately **11% of the variance** in testosterone levels ($R^2 = 0.1108$), indicating that while these physical health markers are important, testosterone levels are likely influenced by a complex array of other unmeasured factors.
 
 ## 🔗 Live Application
-**[Click here to view the interactive app]** ( https://ashtonma.shinyapps.io/ds306group49/)
+**[Click here to view the interactive app]( https://ashtonma.shinyapps.io/ds306group49/)**
 
 > *Note: If the link is not active, please follow the "How to Run Locally" instructions below.*
 
