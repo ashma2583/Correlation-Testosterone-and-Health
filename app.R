@@ -1,23 +1,11 @@
-# ============================================================
-# Title: Integrative Health Predictors of Testosterone in Adult Males
-# File: Shiny.r
-# ============================================================
-
 library(shiny)
 library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(broom)
-library(NHANES)# Ensure this package is installed
+library(NHANES)
 
-# ------------------------------------------------------------
-# 1. GLOBAL DATA PROCESSING
-# (Run this once before the app starts to ensure speed)
-# ------------------------------------------------------------
-
-# Load and Clean Data
-# We filter for males, select our key variables, remove duplicates, 
-# and filter out extreme outliers (e.g. T > 2000 likely TRT).
+# load and clean data
 df <- NHANES |>
   filter(Gender == "male") |>
   select(Testosterone, Age, 
@@ -29,11 +17,9 @@ df <- NHANES |>
     Diabetes = factor(Diabetes),
     PhysActive = factor(PhysActive)
   ) |>
-  filter(Testosterone < 2000, BMI < 80) # Sanity Check / Outlier Removal
+  filter(Testosterone < 2000, BMI < 80)
 
-# ------------------------------------------------------------
-# 2. UI (User Interface)
-# ------------------------------------------------------------
+# ui
 ui <- fluidPage(
   
   titlePanel("Integrative Health Predictors of Testosterone in Adult Males"),
@@ -41,7 +27,7 @@ ui <- fluidPage(
   
   sidebarLayout(
     sidebarPanel(
-      # --- FILTER OPTIONS ---
+      # filter options
       h4("Filter Data"),
       selectInput("diabetes", "Filter by Diabetes Status:", 
                   choices = c("All", "Yes", "No"), selected = "All"),
@@ -50,12 +36,12 @@ ui <- fluidPage(
       
       hr(),
       
-      # --- PLOT OPTIONS ---
+      # plot options
       h4("Visual Exploration"),
       selectInput("xvar", "X-Axis Variable:",
                   choices = c("BMI", "Pulse", "BPDiaAve", "BPSysAve", "UrineFlow1", "TotChol", "Age")),
       
-      # Simpson's Paradox Feature
+      # simpson's paradox revealer
       selectInput("color_by", "Color Points By (Check for Confounding):",
                   choices = c("None", "Diabetes", "PhysActive"), selected = "None"),
       
@@ -63,7 +49,7 @@ ui <- fluidPage(
       
       hr(),
       
-      # --- MODEL OPTIONS ---
+      # model options
       h4("Regression Model Builder"),
       helpText("Select variables to include in the dynamic regression summary (Tab 2)."),
       
@@ -85,17 +71,15 @@ ui <- fluidPage(
       actionButton("run_model", "Update Regression", class = "btn-primary")
     ),
     
-    # --- MAIN PANEL ---
+    # main panel
     mainPanel(
       tabsetPanel(
         
-        # TAB 1: INTERACTIVE PLOT & INSPECTOR
+        # tab 1: interactive plot
         tabPanel("Explorer & Inspector",
                  br(),
-                 # Plot with click interaction
                  plotOutput("scatterPlot", click = "plot_click", height = "500px"),
                  
-                 # Click Inspector Output
                  wellPanel(
                    h4("Patient Inspector"),
                    p("Click on any point in the graph above to see that patient's full profile."),
@@ -104,13 +88,13 @@ ui <- fluidPage(
                  verbatimTextOutput("corrText")
         ),
         
-        # TAB 2: REGRESSION SUMMARY
+        # tab 2: regression summary
         tabPanel("Model Summary",
                  verbatimTextOutput("modelSummary"),
                  helpText("Note: Use the checkboxes in the sidebar to add/remove variables from this model.")
         ),
         
-        # TAB 3: ABOUT (Updated Text)
+        # tab 3: abt
         tabPanel("About",
                  h4("About This App"),
                  p("This interactive web app explores how cardiovascular, metabolic, and renal health indicators 
@@ -146,12 +130,9 @@ ui <- fluidPage(
   )
 )
 
-# ------------------------------------------------------------
-# 3. SERVER
-# ------------------------------------------------------------
+#server
 server <- function(input, output) {
   
-  # A. Filter Logic (Reactive)
   filtered_data <- reactive({
     data <- df
     if (input$diabetes != "All") {
@@ -163,25 +144,20 @@ server <- function(input, output) {
     data
   })
   
-  # B. Scatter Plot Logic (With Simpson's Paradox Coloring)
   output$scatterPlot <- renderPlot({
     data <- filtered_data()
     
-    # Base Plot
     p <- ggplot(data, aes_string(x = input$xvar, y = "Testosterone")) +
       theme_minimal(base_size = 15) +
       labs(title = paste("Testosterone vs.", input$xvar))
     
-    # Conditional Coloring
     if (input$color_by != "None") {
       p <- p + geom_point(aes_string(color = input$color_by), alpha = 0.6, size = 3) +
-        # Add separate regression lines for each group
         geom_smooth(aes_string(color = input$color_by, fill = input$color_by), method = "lm", alpha = 0.1)
     } else {
       p <- p + geom_point(color = "#2c3e50", alpha = 0.6, size = 3)
     }
     
-    # Overall Regression Line
     if (input$show_smooth && input$color_by == "None") {
       p <- p + geom_smooth(method = "lm", color = "#e74c3c", fill = "#e74c3c", alpha = 0.2)
     }
@@ -189,24 +165,19 @@ server <- function(input, output) {
     p
   })
   
-  # C. Click Inspector Logic
   output$click_info <- renderTable({
-    # Finds rows in the data close to the click
     nearPoints(filtered_data(), input$plot_click, addDist = TRUE) %>%
       select(Testosterone, Age, BMI, Pulse, BPDiaAve, UrineFlow1, Diabetes, PhysActive)
   })
   
-  # D. Correlation Text Output
   output$corrText <- renderPrint({
     data <- filtered_data()
     if(nrow(data) > 2){
-      # Ensure numeric columns are selected for correlation
       if(is.numeric(data[[input$xvar]])) {
         test <- cor.test(data[[input$xvar]], data$Testosterone, use = "complete.obs")
         cat("Pearson Correlation (r):", round(test$estimate, 3), "\n")
         cat("P-value:", format.pval(test$p.value, eps=0.001), "\n")
         
-        # Simple interpretation
         if(test$p.value < 0.05) cat("-> Statistically Significant") else cat("-> Not Significant")
       } else {
         cat("Correlation cannot be calculated for non-numeric X-variables.")
@@ -216,12 +187,12 @@ server <- function(input, output) {
     }
   })
   
-  # E. Dynamic Regression Model Builder
+  # regression model builder
   model_result <- eventReactive(input$run_model, {
     data <- filtered_data()
     all_vars <- c(input$predictors, input$controls)
     
-    # Validation: prevent crash if nothing selected
+    # validation to prevent crash if needed
     if (length(all_vars) == 0) return(NULL)
     
     formula_str <- paste("Testosterone ~", paste(all_vars, collapse = " + "))
@@ -234,7 +205,5 @@ server <- function(input, output) {
   })
 }
 
-# ------------------------------------------------------------
-# 4. RUN APP
-# ------------------------------------------------------------
+# run app
 shinyApp(ui = ui, server = server)
